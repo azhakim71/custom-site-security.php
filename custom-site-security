@@ -1,0 +1,152 @@
+<?php
+/*
+Plugin Name: WP API Security
+Plugin URI: https://github.com/azhakim71/custom-site-security.php
+Description: Customize site security settings to secure API access and prevent unauthorized copying.
+Version: 1.0
+Author: Azizul Hakim
+Author URI: https://github.com/azhakim71
+License: GPL v2 or later
+Text Domain: wp-api-security
+*/
+
+// Add settings menu
+add_action('admin_menu', 'wp_api_security_menu');
+
+function wp_api_security_menu() {
+    add_menu_page(
+        'WP API Security',
+        'API Security',
+        'manage_options',
+        'wp-api-security-settings',
+        'wp_api_security_settings_page',
+        'dashicons-lock', // Icon
+        30 // Menu position
+    );
+}
+
+// Settings page content
+function wp_api_security_settings_page() {
+    ?>
+    <div class="wrap">
+        <h2>WP API Security Settings</h2>
+        <form method="post" action="options.php">
+            <?php settings_fields('wp_api_security_options'); ?>
+            <?php do_settings_sections('wp-api-security-settings'); ?>
+            <?php submit_button(); ?>
+        </form>
+    </div>
+    <?php
+}
+
+// Register settings
+add_action('admin_init', 'wp_api_security_register_settings');
+
+function wp_api_security_register_settings() {
+    // Register setting for API access
+    register_setting('wp_api_security_options', 'wp_api_security_api_access');
+
+    // Add section for API settings
+    add_settings_section(
+        'wp_api_security_api_section',
+        'API Access Settings',
+        'wp_api_security_api_section_callback',
+        'wp-api-security-settings'
+    );
+
+    // Add fields for API access
+    add_settings_field(
+        'wp_api_security_api_access',
+        'Enable API Access',
+        'wp_api_security_api_access_callback',
+        'wp-api-security-settings',
+        'wp_api_security_api_section'
+    );
+
+    // Register setting for right-click and text selection
+    register_setting('wp_api_security_options', 'wp_api_security_disable_copy');
+
+    // Add section for right-click and text selection
+    add_settings_section(
+        'wp_api_security_copy_section',
+        'Disable Copy Settings',
+        'wp_api_security_copy_section_callback',
+        'wp-api-security-settings'
+    );
+
+    // Add fields for right-click and text selection
+    add_settings_field(
+        'wp_api_security_disable_copy',
+        'Disable Right-Click and Text Selection',
+        'wp_api_security_disable_copy_callback',
+        'wp-api-security-settings',
+        'wp_api_security_copy_section'
+    );
+}
+
+// Section callbacks
+function wp_api_security_api_section_callback() {
+    echo 'Configure settings to control API access and prevent copying of site content.';
+}
+
+function wp_api_security_copy_section_callback() {
+    echo 'Settings to disable right-click and text selection to prevent content copying.';
+}
+
+// API access field callback
+function wp_api_security_api_access_callback() {
+    $api_access = get_option('wp_api_security_api_access');
+    ?>
+    <label for="wp_api_security_api_access">
+        <input type="checkbox" id="wp_api_security_api_access" name="wp_api_security_api_access" value="1" <?php checked(1, $api_access); ?> />
+        Allow API access
+    </label>
+    <?php
+}
+
+// Disable copy field callback
+function wp_api_security_disable_copy_callback() {
+    $disable_copy = get_option('wp_api_security_disable_copy');
+    ?>
+    <label for="wp_api_security_disable_copy">
+        <input type="checkbox" id="wp_api_security_disable_copy" name="wp_api_security_disable_copy" value="1" <?php checked(1, $disable_copy); ?> />
+        Disable right-click and text selection
+    </label>
+    <?php
+}
+
+// Check API access and disable REST API if necessary
+add_action('rest_api_init', 'wp_api_security_disable_rest_api');
+
+function wp_api_security_disable_rest_api() {
+    $api_access = get_option('wp_api_security_api_access');
+    if (!$api_access) {
+        // Disable REST API for non-logged-in users
+        add_filter('rest_authentication_errors', function ($result) {
+            if (!is_user_logged_in()) {
+                return new WP_Error('rest_forbidden', 'You do not have permission to access this API.', array('status' => 401));
+            }
+            return $result;
+        });
+    }
+}
+
+// Disable right-click and text selection script
+add_action('wp_footer', 'wp_api_security_disable_copy_script');
+
+function wp_api_security_disable_copy_script() {
+    $disable_copy = get_option('wp_api_security_disable_copy');
+    if ($disable_copy) {
+        ?>
+        <script>
+        document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+        }, false);
+
+        document.addEventListener('selectstart', function(e) {
+            e.preventDefault();
+        }, false);
+        </script>
+        <?php
+    }
+}
